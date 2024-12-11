@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import scipy
 from scipy.signal import butter, filtfilt
 from Math import *
+from get_XYZ import *
+
 
 def get_ind(xyz, line=None, ind=None, lines=(), tt_lim=(), splits=(1,)):
     """
@@ -267,3 +269,55 @@ def plot(tt, mag, detrend_data=False, detrend_type="linear"):
         mag = detrend(mag, type=detrend_type)
     plt.plot(tt, mag)
     # plt.show()
+
+
+def min_max_normalize(array):
+    min_val = np.min(array)
+    max_val = np.max(array)
+    normalized = (array - min_val) / (max_val - min_val)
+    return normalized
+
+
+def z_score_normalize(array):
+    mean = np.mean(array)
+    std = np.std(array)
+    normalized = (array - mean) / std
+    return normalized
+
+
+def calculate_error(mag_comp, mag_true, detrend_type="linear"):
+    mag_comp = detrend(mag_comp, type=detrend_type)
+    mag_true = detrend(mag_true, type=detrend_type)
+    return np.round(np.mean(abs(mag_comp - mag_true)), decimals=2)
+
+
+if __name__ == '__main__':
+    flight = "Flt1006"
+    df_flight_path = "datasets/dataframes/df_flight.csv"
+    df_flight = pd.read_csv(df_flight_path)
+    xyz = get_XYZ(flight, df_flight)
+    print(xyz.keys())
+
+    map_name = "Eastern_395"  # select map, full list in df_map
+    df_options = [55770.0, 56609.0]
+    line = "1006.08"  # select flight line (row) from df_options
+    ind = get_ind(xyz, tt_lim=[df_options[0], df_options[1]])  # get Boolean indices
+    print("ind:{}-{}".format(df_options[0], df_options[1]))
+
+    TL_i = 5
+    df_cal_path = "datasets/dataframes/df_cal.csv"
+    df_cal = pd.read_csv(df_cal_path)
+    TL_ind = get_ind(xyz, tt_lim=[df_cal['t_start'][TL_i], df_cal['t_end'][TL_i]])
+    print("TL_ind:{}-{}".format(df_cal['t_start'][TL_i], df_cal['t_end'][TL_i]))
+
+    p1 = plot_mag(xyz, ind=ind, use_mags=['mag_1_uc', 'mag_4_uc', 'mag_5_uc'], detrend_data=True)
+    p2 = plot_mag(xyz, ind=ind, use_mags=['flux_d'], detrend_data=True, vec_terms=True)
+    p2.show()
+
+    lpf = get_bpf(pass1=0.0, pass2=0.2, fs=10.0)
+    lpf_sig = -bpf_data(xyz['cur_strb'][TL_ind], bpf=lpf)  # apply low-pass filter, sign switched for easier comparison
+    plt.figure()
+    plt.plot(xyz['tt'][TL_ind], xyz['cur_strb'][TL_ind])
+    plt.figure()
+    plt.plot(xyz['tt'][TL_ind], lpf_sig)
+    plt.show()
